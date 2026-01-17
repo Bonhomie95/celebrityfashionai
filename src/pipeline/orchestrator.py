@@ -8,10 +8,17 @@ from src.ingestion.video_downloader import download_video
 from src.processing.frame_extractor import extract_frames
 from src.detection.object_detector import FashionObjectDetector
 from src.detection.item_tracker import track_items
+
 from src.crops.cropper import crop_items
 from src.crops.quality_check import filter_crops
+
+from src.crops.face_cropper import crop_face_from_person
+from src.classification.glasses_classifier import classify_glasses
+
 from src.enrichment.price_estimator import estimate_prices
 from src.video.overlay import render_overlay
+
+from src.config.paths import FACE_DIR
 
 log = get_logger("orchestrator")
 
@@ -20,6 +27,7 @@ log = get_logger("orchestrator")
 # ORCHESTRATOR
 # --------------------------------------------------
 
+
 def run(
     url: str,
     *,
@@ -27,13 +35,6 @@ def run(
 ) -> Optional[Path]:
     """
     Run the full celebrity fashion pipeline on a single video.
-
-    Args:
-        url: Video URL (YouTube / Shorts / TikTok / IG)
-        skip_overlay: If True, stops after price estimation
-
-    Returns:
-        Path to final tagged video or None if pipeline stopped early
     """
 
     log_section("PIPELINE START")
@@ -81,7 +82,24 @@ def run(
         return None
 
     # --------------------------------------------------
-    # 5. CROPPING
+    # 4.5 FACE CROPPING (PERSON ONLY)
+    # --------------------------------------------------
+
+    for item in unique_items:
+        if item.get("item") != "person":
+            continue
+
+        face_path = crop_face_from_person(
+            frame_path=item["frame"],
+            person_bbox=item["bbox"],
+            output_path=FACE_DIR / f"{item['id']}_face.jpg",
+        )
+
+        if face_path:
+            item["face_crop"] = face_path
+
+    # --------------------------------------------------
+    # 5. CROPPING (FASHION ITEMS)
     # --------------------------------------------------
 
     crops = crop_items(
@@ -102,6 +120,17 @@ def run(
     if not good_crops:
         log.warning("All crops failed quality checks — stopping")
         return None
+
+    # --------------------------------------------------
+    # 6.5 GLASSES CLASSIFICATION (FACE ONLY)
+    # --------------------------------------------------
+
+    for item in good_crops:
+        face = item.get("face_crop")
+        if not face:
+            continue
+
+        item["glasses"] = classify_glasses(face)
 
     # --------------------------------------------------
     # 7. PRICE ESTIMATION

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from collections import defaultdict
 
 from src.utils.logger import get_logger, log_section
@@ -11,6 +11,7 @@ log = get_logger("item-tracker")
 # --------------------------------------------------
 # IOU
 # --------------------------------------------------
+
 
 def _iou(box1: List[int], box2: List[int]) -> float:
     """
@@ -36,6 +37,7 @@ def _iou(box1: List[int], box2: List[int]) -> float:
 # TRACKER
 # --------------------------------------------------
 
+
 def track_items(
     detections: List[Dict],
     iou_threshold: float = 0.5,
@@ -49,8 +51,9 @@ def track_items(
     Output:
         [
           {
+            "id": str,
             "item": str,
-            "best_frame": Path,
+            "frame": Path,
             "confidence": float,
             "bbox": [x1, y1, x2, y2],
             "frames_seen": int
@@ -75,7 +78,7 @@ def track_items(
     # PROCESS EACH ITEM TYPE
     # --------------------------------------------------
 
-    for item, item_detections in grouped.items():
+    for item_name, item_detections in grouped.items():
         clusters: List[List[Dict]] = []
 
         for det in item_detections:
@@ -94,14 +97,15 @@ def track_items(
         # PICK BEST FROM EACH CLUSTER
         # --------------------------------------------------
 
-        for cluster in clusters:
+        for idx, cluster in enumerate(clusters):
             best = max(cluster, key=lambda d: d["confidence"])
 
             final_items.append(
                 {
-                    "item": item,
-                    "best_frame": best["frame"],
-                    "confidence": best["confidence"],
+                    "id": f"{item_name}_{idx}",  # ✅ stable ID
+                    "item": item_name,
+                    "frame": best["frame"],  # ✅ expected downstream
+                    "confidence": float(best["confidence"]),
                     "bbox": best["bbox"],
                     "frames_seen": len(cluster),
                 }

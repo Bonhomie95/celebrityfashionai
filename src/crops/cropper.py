@@ -15,6 +15,7 @@ log = get_logger("cropper")
 # HELPERS
 # --------------------------------------------------
 
+
 def _expand_bbox(
     bbox: List[int],
     img_width: int,
@@ -43,22 +44,13 @@ def _expand_bbox(
 # MAIN
 # --------------------------------------------------
 
+
 def crop_items(
     tracked_items: List[Dict],
     video_id: str,
 ) -> List[Dict]:
     """
     Crop detected items from their best frames.
-
-    Returns:
-        [
-          {
-            "item": str,
-            "confidence": float,
-            "crop_path": Path,
-            "bbox": [x1, y1, x2, y2]
-          }
-        ]
     """
 
     log_section("Cropping Detected Items")
@@ -69,7 +61,7 @@ def crop_items(
     cropped_items: List[Dict] = []
 
     for idx, item in enumerate(tracked_items):
-        frame_path: Path = item["best_frame"]
+        frame_path: Path = item["frame"]  # ✅ FIXED
         bbox = item["bbox"]
 
         image = cv2.imread(str(frame_path))
@@ -85,23 +77,19 @@ def crop_items(
             log.warning("Empty crop skipped")
             continue
 
-        crop_name = (
-            f"{item['item']}_{idx:02d}_"
-            f"{frame_path.stem}.jpg"
-        )
+        crop_name = f"{item['id']}_{frame_path.stem}.jpg"
         crop_path = output_dir / crop_name
 
         cv2.imwrite(str(crop_path), crop)
 
+        # ✅ PRESERVE METADATA
         cropped_items.append(
             {
-                "item": item["item"],
-                "confidence": item["confidence"],
+                **item,  # keep id, frame, face_crop, etc
                 "crop_path": crop_path,
                 "bbox": [x1, y1, x2, y2],
             }
         )
 
     log.info(f"Saved {len(cropped_items)} cropped items")
-
     return cropped_items

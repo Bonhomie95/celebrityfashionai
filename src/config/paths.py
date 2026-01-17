@@ -19,6 +19,8 @@ FRAMES_DIR = DATA_DIR / "frames"
 CROPS_DIR = DATA_DIR / "crops"
 METADATA_DIR = DATA_DIR / "metadata"
 CACHE_DIR = DATA_DIR / "cache"
+FACE_DIR = DATA_DIR / "faces"
+
 
 # --------------------------------------------------
 # MODELS
@@ -61,6 +63,8 @@ ALL_DIRS = [
     CROPS_DIR,
     METADATA_DIR,
     CACHE_DIR,
+    FACE_DIR,
+    OUTPUT_DIR,
     YOLO_WEIGHTS_DIR,
     YOLO_CONFIG_DIR,
     TAGGED_VIDEO_DIR,
