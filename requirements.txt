@@ -1,0 +1,23 @@
+# Core
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+
+# Video & Image
+opencv-python>=4.9.0
+pillow>=10.0.0
+moviepy==1.0.3
+ffmpeg-python>=0.2.0
+
+# ML / Vision
+ultralytics>=8.1.0
+torch>=2.1.0
+torchvision>=0.16.0
+numpy>=1.26.0
+
+# Downloading
+yt-dlp>=2024.1.1
+
+# Utilities
+tqdm>=4.66.0
+requests>=2.31.0
+rich>=13.7.0
