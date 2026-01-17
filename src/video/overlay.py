@@ -1,109 +1,121 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any
 
-from moviepy.editor import (
-    VideoFileClip,
-    CompositeVideoClip,
-    TextClip,
-)
+from PIL import Image, ImageDraw, ImageFont
+from moviepy.editor import VideoFileClip, CompositeVideoClip, ImageClip
 
-from src.config.settings import VIDEO_CODEC, VIDEO_BITRATE, TEXT_FONT
-from src.config.paths import TAGGED_VIDEO_DIR
+from src.config.paths import OUTPUT_DIR
 from src.utils.logger import get_logger, log_section
+import numpy as np
 
 log = get_logger("overlay")
 
 
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
+def _build_label(item: Dict[str, Any]) -> str:
+    price = item.get("price_range", "Unknown price")
+    name = item.get("item", "Item")
+    return f"{name} • {price}"
 
-def _build_label(item: Dict) -> str:
+
+def _render_text_image(
+    text: str,
+    width: int,
+    font_size: int = 42,
+) -> Image.Image:
     """
-    Create human-friendly overlay text.
+    Render text into a PIL image (no ImageMagick).
     """
-    emoji_map = {
-        "watch": "⌚",
-        "shoe": "👟",
-        "necklace": "💎",
-        "ring": "💍",
-        "bracelet": "📿",
-    }
+    padding = 20
+    bg_color = (0, 0, 0, 160)  # semi-transparent
+    text_color = (255, 255, 255, 255)
 
-    emoji = emoji_map.get(item["item"], "")
-    return f"{emoji} {item['item'].title()}: {item['price_range']}"
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except Exception:
+        font = ImageFont.load_default()
 
+    dummy = Image.new("RGBA", (width, 10))
+    draw = ImageDraw.Draw(dummy)
+    text_bbox = draw.multiline_textbbox((0, 0), text, font=font)
+    text_w = text_bbox[2] - text_bbox[0]
+    text_h = text_bbox[3] - text_bbox[1]
 
-# --------------------------------------------------
-# MAIN
-# --------------------------------------------------
+    img = Image.new(
+        "RGBA",
+        (
+            int(text_w + padding * 2),
+            int(text_h + padding * 2),  # ✅ must be int
+        ),
+        bg_color,
+    )
+
+    draw = ImageDraw.Draw(img)
+    draw.multiline_text(
+        (padding, padding),
+        text,
+        fill=text_color,
+        font=font,
+        align="center",
+    )
+
+    return img
+
 
 def render_overlay(
     video_path: Path,
     video_id: str,
-    priced_items: List[Dict],
+    priced_items: List[Dict[str, Any]],
 ) -> Path:
     """
-    Render price overlays on top of the video.
-
-    Returns:
-        Path to tagged video
+    Render price overlays using PIL (Windows-safe).
     """
 
     log_section("Rendering Video Overlay")
 
-    if not priced_items:
-        log.warning("No priced items found — skipping overlay")
-        return video_path
+    video = VideoFileClip(str(video_path))
+    video_w, video_h = video.size
 
-    clip = VideoFileClip(str(video_path))
-    overlays = []
+    overlays: List[ImageClip] = []
 
-    margin_x = 40
-    margin_y = 120
-    line_spacing = 58
-
-    for idx, item in enumerate(priced_items):
+    for idx, item in enumerate(priced_items[:5]):  # limit clutter
         label = _build_label(item)
 
-        txt = (
-            TextClip(
-                label,
-                fontsize=42,
-                font=TEXT_FONT,
-                color="white",
-                stroke_color="black",
-                stroke_width=2,
-                method="label",
-            )
-            .set_position(
-                ("left", margin_y + idx * line_spacing)
-            )
-            .set_duration(clip.duration)
+        img = _render_text_image(
+            text=label,
+            width=int(video_w * 0.9),
         )
 
-        overlays.append(txt)
+        clip = (
+            ImageClip(np.array(img))
+            .set_duration(video.duration)
+            .set_position(
+                (
+                    "center",
+                    int(video_h * 0.1 + idx * 70),
+                )
+            )
+        )
 
-    final = CompositeVideoClip([clip, *overlays])
+        overlays.append(clip)
 
-    output_path = TAGGED_VIDEO_DIR / f"{video_id}_tagged.mp4"
+    final = CompositeVideoClip([video] + overlays)
 
-    log.info("Exporting final video...")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUTPUT_DIR / f"{video_id}_priced.mp4"
 
     final.write_videofile(
-        str(output_path),
-        codec=VIDEO_CODEC,
-        bitrate=VIDEO_BITRATE,
+        str(out_path),
+        codec="libx264",
         audio_codec="aac",
+        fps=video.fps,
         threads=4,
         logger=None,
     )
 
-    clip.close()
+    video.close()
     final.close()
 
-    log.info(f"Tagged video saved → {output_path}")
-
-    return output_path
+    log.info(f"Overlay video saved → {out_path}")
+    return out_path

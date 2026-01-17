@@ -66,13 +66,9 @@ YOLO_MODEL_PATH = os.getenv(
     str(MODEL_DIR / "yolo" / "weights" / "yolov8-fashion.pt"),
 )
 
-YOLO_CONFIDENCE_THRESHOLD = float(
-    os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.5")
-)
+YOLO_CONFIDENCE_THRESHOLD = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.5"))
 
-YOLO_IOU_THRESHOLD = float(
-    os.getenv("YOLO_IOU_THRESHOLD", "0.45")
-)
+YOLO_IOU_THRESHOLD = float(os.getenv("YOLO_IOU_THRESHOLD", "0.45"))
 
 DETECTION_CLASSES = [
     "shoe",
@@ -80,15 +76,17 @@ DETECTION_CLASSES = [
     "necklace",
     "ring",
     "bracelet",
+    "person",
+    "handbag",
+    "backpack",
+    "tie",
 ]
 
 # --------------------------------------------------
 # BRAND & PRICE ESTIMATION
 # --------------------------------------------------
 
-PRICE_CONFIDENCE_MIN = float(
-    os.getenv("PRICE_CONFIDENCE_MIN", "0.6")
-)
+PRICE_CONFIDENCE_MIN = float(os.getenv("PRICE_CONFIDENCE_MIN", "0.6"))
 
 DEFAULT_PRICE_RANGE = "$500 – $5,000"
 
@@ -122,14 +120,13 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # VALIDATION
 # --------------------------------------------------
 
+
 def validate_settings() -> None:
     if not YOLO_MODEL_PATH:
         raise RuntimeError("YOLO_MODEL_PATH is not set")
 
     if ENABLE_WEB_LOOKUP and not BING_SEARCH_API_KEY:
-        raise RuntimeError(
-            "ENABLE_WEB_LOOKUP=true but BING_SEARCH_API_KEY is missing"
-        )
+        raise RuntimeError("ENABLE_WEB_LOOKUP=true but BING_SEARCH_API_KEY is missing")
 
 
 validate_settings()

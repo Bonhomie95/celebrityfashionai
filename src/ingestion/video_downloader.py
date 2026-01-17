@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional, Any, Mapping, cast
+from typing import Dict, Optional, Any, Mapping
 
 import yt_dlp
 
@@ -62,8 +62,8 @@ def download_video(
         "skip_download": True,
     }
 
-    # ✅ positional dict — correct yt-dlp usage
-    with yt_dlp.YoutubeDL(cast(Any, ydl_meta_opts)) as ydl:
+    # 🔇 pyright false-positive (yt-dlp typing bug)
+    with yt_dlp.YoutubeDL(ydl_meta_opts) as ydl:  # pyright: ignore[reportArgumentType]
         info = ydl.extract_info(url, download=False)
 
     video_id = str(info.get("id") or "")
@@ -99,11 +99,11 @@ def download_video(
     # DOWNLOAD
     # --------------------------------------------------
 
-    output_template = filename or f"{video_id}.%(ext)s"
+    output_template = str(RAW_VIDEO_DIR / "%(id)s.%(ext)s")
 
     ydl_download_opts = {
-        "outtmpl": str(RAW_VIDEO_DIR / output_template),
-        "format": "bestvideo[ext=mp4]/best[ext=mp4]/best",
+        "outtmpl": output_template,
+        "format": "bv*[ext=mp4]/b[ext=mp4]/bv*/b",
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
@@ -111,21 +111,29 @@ def download_video(
 
     log.info("Downloading video…")
 
-    # ✅ positional dict again
-    with yt_dlp.YoutubeDL(cast(Any, ydl_meta_opts)) as ydl:
-        ydl.download([url])
+    # 🔇 pyright false-positive again
+    with yt_dlp.YoutubeDL(
+        ydl_download_opts
+    ) as ydl:  # pyright: ignore[reportArgumentType]
+        result = ydl.extract_info(url, download=True)
+    final_path = Path(ydl.prepare_filename(result))
 
-    downloaded = _video_exists(video_id)
-    if not downloaded:
-        raise RuntimeError("Download failed — file not found")
+    # yt-dlp may download webm first, then merge to mp4
+    if final_path.suffix != ".mp4":
+        mp4_path = final_path.with_suffix(".mp4")
+        if mp4_path.exists():
+            final_path = mp4_path
 
-    log.info("Download complete")
+    if not final_path.exists():
+        raise RuntimeError(f"Download failed — file not found at {final_path}")
+
+    log.info(f"Download complete → {final_path}")
 
     return {
         "video_id": video_id,
         "title": title,
         "source": source,
-        "path": downloaded,
+        "path": final_path,  # ✅ FIXED
         "duration": info.get("duration"),
         "resolution": info.get("height"),
     }
